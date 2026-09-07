@@ -42,12 +42,12 @@ public sealed class DiscordBridge : IAsyncDisposable
         _bnet.OnUserJoined += name =>
         {
             _ = PostToDiscordAsync($"_→ {name} joined the channel_");
-            _ = SendOwnerNotificationAsync($"📊 [BNet] {name} joined the channel");
+            _ = SendOwnerNotificationAsync($"📢 [BNet] {name} joined the channel");
         };
         _bnet.OnUserLeft += name =>
         {
             _ = PostToDiscordAsync($"_← {name} left the channel_");
-            _ = SendOwnerNotificationAsync($"📊 [BNet] {name} left the channel");
+            _ = SendOwnerNotificationAsync($"📢 [BNet] {name} left the channel");
         };
         _bnet.OnServerInfo += text =>
         {
@@ -118,6 +118,15 @@ public sealed class DiscordBridge : IAsyncDisposable
     {
         if (rawMessage is not SocketUserMessage message) return;
         if (message.Author.IsBot) return;
+
+        // Check if this is a DM to the bot
+        if (message.Channel is IDMChannel dmChannel)
+        {
+            await HandleDirectMessageAsync(message);
+            return;
+        }
+
+        // Only process messages in the bridge channel
         if (message.Channel.Id != _bridgeChannelId) return;
 
         var content = message.Content;
@@ -141,6 +150,37 @@ public sealed class DiscordBridge : IAsyncDisposable
         // BNCS chat lines have a length cap (~255 bytes); trim defensively.
         if (text.Length > 250) text = text[..247] + "...";
         await _bnet.SayAsync(text);
+    }
+
+    /// <summary>
+    /// Handles direct messages sent to the bot and forwards them to the owner.
+    /// </summary>
+    private async Task HandleDirectMessageAsync(SocketUserMessage message)
+    {
+        try
+        {
+            if (_ownerId == 0) return; // Owner ID not configured
+
+            var owner = await _discord.GetUserAsync(_ownerId);
+            if (owner != null)
+            {
+                var dmChannel = await owner.CreateDMChannelAsync();
+                if (dmChannel != null)
+                {
+                    var senderName = message.Author.Username;
+                    var senderId = message.Author.Id;
+                    var content = message.Content;
+
+                    var notification = $"📨 **DM from {senderName}** ({senderId}):\n{content}";
+                    await dmChannel.SendMessageAsync(SanitizeForDiscord(notification));
+                    Console.WriteLine($"Forwarded DM from {senderName}: {content}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to forward DM to owner: {ex.Message}");
+        }
     }
 
     /// <summary>

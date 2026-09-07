@@ -15,18 +15,27 @@ public sealed class DiscordBridge : IAsyncDisposable
     private readonly BncsClient _bnet;
     private readonly ulong _bridgeChannelId;
     private readonly string _commandPrefix;
+    private readonly ChatTriggerManager _triggerManager;
 
-    public DiscordBridge(BncsClient bnet, ulong bridgeChannelId, string commandPrefix = "!")
+    public DiscordBridge(BncsClient bnet, ulong bridgeChannelId, string commandPrefix = "!", ChatTriggerManager? triggerManager = null)
     {
         _bnet = bnet;
         _bridgeChannelId = bridgeChannelId;
         _commandPrefix = commandPrefix;
+        _triggerManager = triggerManager ?? new ChatTriggerManager();
 
         // Battle.net -> Discord
         _bnet.OnChatMessage += msg =>
         {
             var prefix = msg.Kind == ChatEventId.EID_EMOTE ? "* " : "";
             _ = PostToDiscordAsync($"**[BNet] {msg.Username}:** {prefix}{msg.Text}");
+
+            // Check for auto-responses to Battle.net chat
+            var responses = _triggerManager.GetMatchingResponses(msg.Text, fromDiscord: false);
+            foreach (var response in responses)
+            {
+                _ = Task.Delay(500).ContinueWith(_ => _bnet.SayAsync(response));
+            }
         };
         _bnet.OnUserJoined += name => _ = PostToDiscordAsync($"_→ {name} joined the channel_");
         _bnet.OnUserLeft += name => _ = PostToDiscordAsync($"_← {name} left the channel_");
@@ -63,6 +72,13 @@ public sealed class DiscordBridge : IAsyncDisposable
         {
             await HandleModerationCommandAsync(content[_commandPrefix.Length..].Trim(), message);
             return;
+        }
+
+        // Check for auto-responses to Discord chat
+        var responses = _triggerManager.GetMatchingResponses(content, fromDiscord: true);
+        foreach (var response in responses)
+        {
+            await message.Channel.SendMessageAsync(SanitizeForDiscord(response));
         }
 
         // Plain chat relay: Discord display name + message -> BNCS channel.
@@ -119,6 +135,8 @@ public sealed class DiscordBridge : IAsyncDisposable
 
     private static string SanitizeForDiscord(string s) =>
         Regex.Replace(s, "(?<!\\\\)([_*~`|])", "\\$1"); // escape Discord markdown from BNet text
+
+    public ChatTriggerManager GetTriggerManager() => _triggerManager;
 
     public async ValueTask DisposeAsync()
     {

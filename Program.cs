@@ -25,16 +25,51 @@ IGameAuthProvider auth = throw new NotImplementedException(
 var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
 
+// Create trigger manager and add some example triggers
+var triggerManager = new ChatTriggerManager();
+triggerManager.AddTrigger(new ChatTrigger
+{
+    Id = "hello",
+    Pattern = "hello",
+    Response = "Hello! Welcome to the channel.",
+    IsRegex = false,
+    CooldownSeconds = 5
+});
+
+triggerManager.AddTrigger(new ChatTrigger
+{
+    Id = "how are you",
+    Pattern = "how are you",
+    Response = "I'm doing great, thanks for asking!",
+    IsRegex = false,
+    CooldownSeconds = 10
+});
+
+triggerManager.AddTrigger(new ChatTrigger
+{
+    Id = "bot alive",
+    Pattern = "^bot alive",
+    Response = "Yes, I'm alive and listening!",
+    IsRegex = true,
+    CooldownSeconds = 5
+});
+
 await using var bnet = new BncsClient(
     config.BnetHost, config.BnetPort,
     config.BnetUsername, config.BnetPassword,
     config.BnetChannel, auth);
 
-await using var bridge = new DiscordBridge(bnet, config.DiscordBridgeChannelId, config.CommandPrefix);
+await using var bridge = new DiscordBridge(bnet, config.DiscordBridgeChannelId, config.CommandPrefix, triggerManager);
 
 await bridge.StartAsync(config.DiscordToken);
 await bnet.ConnectAndLoginAsync(cts.Token);
 
 Console.WriteLine("Bridge running. Press Ctrl+C to stop.");
+Console.WriteLine("Active triggers:");
+foreach (var trigger in triggerManager.GetAllTriggers())
+{
+    Console.WriteLine($"  - {trigger.Id}: '{trigger.Pattern}' -> '{trigger.Response}'");
+}
+
 try { await Task.Delay(Timeout.Infinite, cts.Token); }
 catch (TaskCanceledException) { }

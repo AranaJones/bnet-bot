@@ -17,6 +17,7 @@ public sealed class DiscordBridge : IAsyncDisposable
     private readonly ulong _ownerId;
     private readonly string _commandPrefix;
     private readonly ChatTriggerManager _triggerManager;
+    private readonly HashSet<string> _contactedUsers = new(); // Track who's already requested contact
 
     public DiscordBridge(BncsClient bnet, ulong bridgeChannelId, ulong ownerId, string commandPrefix = "!", ChatTriggerManager? triggerManager = null)
     {
@@ -31,6 +32,13 @@ public sealed class DiscordBridge : IAsyncDisposable
         {
             var prefix = msg.Kind == ChatEventId.EID_EMOTE ? "* " : "";
             _ = PostToDiscordAsync($"**[BNet] {msg.Username}:** {prefix}{msg.Text}");
+
+            // Check if someone is requesting to contact the owner
+            if (msg.Text.Contains("contact member", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = SendOwnerNotificationAsync($"📞 **{msg.Username}** is wanting to contact you!");
+                Console.WriteLine($"[Contact Request] {msg.Username} wants to contact the owner.");
+            }
 
             // Check for auto-responses to Battle.net chat
             var responses = _triggerManager.GetMatchingResponses(msg.Text, fromDiscord: false);
@@ -171,7 +179,7 @@ public sealed class DiscordBridge : IAsyncDisposable
                     var senderId = message.Author.Id;
                     var content = message.Content;
 
-                    var notification = $"📨 **DM from {senderName}** ({senderId}):\n{content}";
+                    var notification = $"💬 **DM from {senderName}** ({senderId}):\n{content}";
                     await dmChannel.SendMessageAsync(SanitizeForDiscord(notification));
                     Console.WriteLine($"Forwarded DM from {senderName}: {content}");
                 }

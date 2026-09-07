@@ -15,6 +15,8 @@ if (string.IsNullOrWhiteSpace(config.DiscordToken))
     throw new InvalidOperationException("Set DiscordToken in appsettings.json or BRIDGE_DiscordToken env var.");
 if (string.IsNullOrWhiteSpace(config.BnetUsername))
     throw new InvalidOperationException("Set BnetUsername/BnetPassword — see README for CD key handling.");
+if (config.DiscordOwnerId == 0)
+    throw new InvalidOperationException("Set DiscordOwnerId in appsettings.json or BRIDGE_DiscordOwnerId env var (your Discord user ID).");
 
 // TODO: replace with a real IGameAuthProvider backed by BNCSutil (or a port
 // of it) for the exact game/version you're connecting as. See
@@ -59,7 +61,7 @@ await using var bnet = new BncsClient(
     config.BnetUsername, config.BnetPassword,
     config.BnetChannel, auth);
 
-await using var bridge = new DiscordBridge(bnet, config.DiscordBridgeChannelId, config.CommandPrefix, triggerManager);
+await using var bridge = new DiscordBridge(bnet, config.DiscordBridgeChannelId, config.DiscordOwnerId, config.CommandPrefix, triggerManager);
 
 await bridge.StartAsync(config.DiscordToken);
 await bnet.ConnectAndLoginAsync(cts.Token);

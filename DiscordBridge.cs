@@ -9,18 +9,20 @@ public sealed class DiscordBridge : IAsyncDisposable
 {
     private readonly DiscordSocketClient _discord = new(new DiscordSocketConfig
     {
-        GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.MessageContent
+        GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.MessageContent | GatewayIntents.DirectMessages
     });
 
     private readonly BncsClient _bnet;
     private readonly ulong _bridgeChannelId;
+    private readonly ulong _ownerId;
     private readonly string _commandPrefix;
     private readonly ChatTriggerManager _triggerManager;
 
-    public DiscordBridge(BncsClient bnet, ulong bridgeChannelId, string commandPrefix = "!", ChatTriggerManager? triggerManager = null)
+    public DiscordBridge(BncsClient bnet, ulong bridgeChannelId, ulong ownerId, string commandPrefix = "!", ChatTriggerManager? triggerManager = null)
     {
         _bnet = bnet;
         _bridgeChannelId = bridgeChannelId;
+        _ownerId = ownerId;
         _commandPrefix = commandPrefix;
         _triggerManager = triggerManager ?? new ChatTriggerManager();
 
@@ -37,13 +39,34 @@ public sealed class DiscordBridge : IAsyncDisposable
                 _ = Task.Delay(500).ContinueWith(_ => _bnet.SayAsync(response));
             }
         };
-        _bnet.OnUserJoined += name => _ = PostToDiscordAsync($"_→ {name} joined the channel_");
-        _bnet.OnUserLeft += name => _ = PostToDiscordAsync($"_← {name} left the channel_");
-        _bnet.OnServerInfo += text => _ = PostToDiscordAsync($"ℹ️ {text}");
-        _bnet.OnServerError += text => _ = PostToDiscordAsync($"⚠️ {text}");
-        _bnet.OnDisconnected += () => _ = PostToDiscordAsync("🔌 Disconnected from Battle.net.");
+        _bnet.OnUserJoined += name =>
+        {
+            _ = PostToDiscordAsync($"_→ {name} joined the channel_");
+            _ = SendOwnerNotificationAsync($"📊 [BNet] {name} joined the channel");
+        };
+        _bnet.OnUserLeft += name =>
+        {
+            _ = PostToDiscordAsync($"_← {name} left the channel_");
+            _ = SendOwnerNotificationAsync($"📊 [BNet] {name} left the channel");
+        };
+        _bnet.OnServerInfo += text =>
+        {
+            _ = PostToDiscordAsync($"ℹ️ {text}");
+            _ = SendOwnerNotificationAsync($"ℹ️ [BNet Info] {text}");
+        };
+        _bnet.OnServerError += text =>
+        {
+            _ = PostToDiscordAsync($"⚠️ {text}");
+            _ = SendOwnerNotificationAsync($"⚠️ [BNet Error] {text}");
+        };
+        _bnet.OnDisconnected += () =>
+        {
+            _ = PostToDiscordAsync("🔌 Disconnected from Battle.net.");
+            _ = SendOwnerNotificationAsync("🔌 Bot disconnected from Battle.net!");
+        };
 
         _discord.MessageReceived += OnDiscordMessageAsync;
+        _discord.Ready += OnBotReadyAsync;
         _discord.Log += log => { Console.WriteLine(log.ToString()); return Task.CompletedTask; };
     }
 
@@ -53,10 +76,41 @@ public sealed class DiscordBridge : IAsyncDisposable
         await _discord.StartAsync();
     }
 
+    private async Task OnBotReadyAsync()
+    {
+        Console.WriteLine($"Discord bot connected as {_discord.CurrentUser.Username}#{_discord.CurrentUser.Discriminator}");
+        _ = SendOwnerNotificationAsync($"✅ Bot is online! Connected as @{_discord.CurrentUser.Username}");
+    }
+
     private async Task PostToDiscordAsync(string content)
     {
         if (_discord.GetChannel(_bridgeChannelId) is IMessageChannel channel)
             await channel.SendMessageAsync(SanitizeForDiscord(content));
+    }
+
+    /// <summary>
+    /// Sends a direct message to the bot owner.
+    /// </summary>
+    private async Task SendOwnerNotificationAsync(string message)
+    {
+        try
+        {
+            if (_ownerId == 0) return; // Owner ID not configured
+
+            var user = await _discord.GetUserAsync(_ownerId);
+            if (user != null)
+            {
+                var dmChannel = await user.CreateDMChannelAsync();
+                if (dmChannel != null)
+                {
+                    await dmChannel.SendMessageAsync(SanitizeForDiscord(message));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to send DM to owner: {ex.Message}");
+        }
     }
 
     // Discord -> Battle.net, plus moderation commands issued from Discord.

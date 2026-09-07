@@ -13,5 +13,6 @@ public sealed class BridgeConfig
     // Discord side
     public string DiscordToken { get; set; } = "";
     public ulong DiscordBridgeChannelId { get; set; }
+    public ulong DiscordOwnerId { get; set; } // Owner's Discord user ID for DM notifications
     public string CommandPrefix { get; set; } = "!";
 }

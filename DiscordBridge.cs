@@ -192,7 +192,7 @@ public sealed class DiscordBridge : IAsyncDisposable
     }
 
     /// <summary>
-    /// !kick name / !ban name reason / !unban name / !whois name / !say text
+    /// !kick name / !ban name reason / !unban name / !whois name / !say text / !botmaster message
     /// map straight onto Battle.net's own slash commands, which the server
     /// enforces based on the bot's own channel-op status — so the bot's
     /// Battle.net account needs to actually be a channel op for kick/ban to work.
@@ -207,6 +207,9 @@ public sealed class DiscordBridge : IAsyncDisposable
         // Restrict moderation commands to Discord users with kick/ban perms.
         var isMod = message.Author is SocketGuildUser gu &&
                     (gu.GuildPermissions.KickMembers || gu.GuildPermissions.BanMembers || gu.GuildPermissions.Administrator);
+
+        // Check if user is the bot owner
+        var isOwner = message.Author.Id == _ownerId;
 
         switch (cmd)
         {
@@ -225,12 +228,19 @@ public sealed class DiscordBridge : IAsyncDisposable
             case "say" when isMod && rest.Length > 0:
                 await _bnet.SayAsync(rest);
                 break;
+            case "botmaster" when isOwner && rest.Length > 0:
+                await _bnet.SayAsync(rest);
+                await message.Channel.SendMessageAsync($"✅ Sent to Battle.net: {rest}");
+                break;
+            case "botmaster" when !isOwner:
+                await message.Channel.SendMessageAsync("⚠️ Only the bot owner can use this command.");
+                break;
             case "kick" or "ban" or "unban" or "say":
                 await message.Channel.SendMessageAsync("You need kick/ban permissions in Discord to use that.");
                 break;
             default:
                 await message.Channel.SendMessageAsync(
-                    $"Unknown command. Available: {_commandPrefix}say, {_commandPrefix}kick, {_commandPrefix}ban, {_commandPrefix}unban, {_commandPrefix}whois");
+                    $"Unknown command. Available: {_commandPrefix}say, {_commandPrefix}kick, {_commandPrefix}ban, {_commandPrefix}unban, {_commandPrefix}whois, {_commandPrefix}botmaster (owner only)");
                 break;
         }
     }

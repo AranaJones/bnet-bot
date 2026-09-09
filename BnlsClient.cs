@@ -31,4 +31,116 @@ public sealed class BnlsClient : IAsyncDisposable
     private const byte BNLS_AUTHORIZED = 0x0E;
     private const byte BNLS_GAMERESULT = 0x0F;
 
-    public BnlsClient(string host = \"localhost\", int port = 9367)\n    {\n        _host = host;\n        _port = port;\n    }\n\n    /// <summary>\n    /// Connect to BNLS server.\n    /// </summary>\n    public async Task ConnectAsync(CancellationToken ct = default)\n    {\n        _tcp = new System.Net.Sockets.TcpClient();\n        await _tcp.ConnectAsync(_host, _port, ct);\n        _stream = _tcp.GetStream();\n        Console.WriteLine($\"Connected to BNLS at {_host}:{_port}\");\n    }\n\n    /// <summary>\n    /// Hash a CD key using BNLS.\n    /// </summary>\n    public async Task<(uint keyLength, uint product, uint publicValue, byte[] hash)> HashCdKeyAsync(\n        string cdKey, uint clientToken, uint serverToken, string productId, CancellationToken ct = default)\n    {\n        if (_stream == null)\n            throw new InvalidOperationException(\"Not connected to BNLS\");\n\n        var request = new BncsPacketWriter(BNLS_CDKEY)\n            .WriteUInt32(clientToken)\n            .WriteUInt32(serverToken)\n            .WriteCString(productId)\n            .WriteCString(cdKey)\n            .ToBytes();\n\n        await _stream.WriteAsync(request, ct);\n\n        var response = await BncsPacketReader.ReadFromStreamAsync(_stream, ct)\n            ?? throw new IOException(\"BNLS disconnected during CD key hash\");\n\n        var status = response.ReadUInt32();\n        if (status != 0)\n            throw new InvalidOperationException($\"BNLS CD key hash failed (status {status})\");\n\n        var keyLength = response.ReadUInt32();\n        var product = response.ReadUInt32();\n        var publicValue = response.ReadUInt32();\n        var hash = response.ReadRemaining();\n\n        return (keyLength, product, publicValue, hash);\n    }\n\n    /// <summary>\n    /// Perform version check using BNLS.\n    /// </summary>\n    public async Task<(uint exeVersion, uint exeHash, string exeInfo)> VersionCheckAsync(\n        string productId, string fileName, uint fileTime, string formula, uint clientToken, uint serverToken, CancellationToken ct = default)\n    {\n        if (_stream == null)\n            throw new InvalidOperationException(\"Not connected to BNLS\");\n\n        var request = new BncsPacketWriter(BNLS_VERSIONCHECK)\n            .WriteCString(productId)\n            .WriteCString(fileName)\n            .WriteUInt32(fileTime)\n            .WriteUInt32((uint)formula.Length)\n            .WriteCString(formula)\n            .WriteUInt32(clientToken)\n            .WriteUInt32(serverToken)\n            .ToBytes();\n\n        await _stream.WriteAsync(request, ct);\n\n        var response = await BncsPacketReader.ReadFromStreamAsync(_stream, ct)\n            ?? throw new IOException(\"BNLS disconnected during version check\");\n\n        var status = response.ReadUInt32();\n        if (status != 0)\n            throw new InvalidOperationException($\"BNLS version check failed (status {status})\");\n\n        var exeVersion = response.ReadUInt32();\n        var exeHash = response.ReadUInt32();\n        var exeInfo = response.ReadCString();\n\n        return (exeVersion, exeHash, exeInfo);\n    }\n\n    /// <summary>\n    /// Get broken SHA-1 hash from BNLS.\n    /// </summary>\n    public async Task<byte[]> GetBrokenSha1Async(byte[] data, CancellationToken ct = default)\n    {\n        if (_stream == null)\n            throw new InvalidOperationException(\"Not connected to BNLS\");\n\n        var request = new BncsPacketWriter(0x14) // custom BNLS command for SHA1\n            .WriteUInt32((uint)data.Length)\n            .WriteRaw(data)\n            .ToBytes();\n\n        await _stream.WriteAsync(request, ct);\n\n        var response = await BncsPacketReader.ReadFromStreamAsync(_stream, ct)\n            ?? throw new IOException(\"BNLS disconnected during SHA1 hash\");\n\n        return response.ReadRemaining();\n    }\n\n    public async ValueTask DisposeAsync()\n    {\n        _stream?.Dispose();\n        _tcp?.Dispose();\n        await Task.CompletedTask;\n    }\n}\n
+    public BnlsClient(string host = "localhost", int port = 9367)
+    {
+        _host = host;
+        _port = port;
+    }
+
+    /// <summary>
+    /// Connect to BNLS server.
+    /// </summary>
+    public async Task ConnectAsync(CancellationToken ct = default)
+    {
+        _tcp = new System.Net.Sockets.TcpClient();
+        await _tcp.ConnectAsync(_host, _port, ct);
+        _stream = _tcp.GetStream();
+        Console.WriteLine($"Connected to BNLS at {_host}:{_port}");
+    }
+
+    /// <summary>
+    /// Hash a CD key using BNLS.
+    /// </summary>
+    public async Task<(uint keyLength, uint product, uint publicValue, byte[] hash)> HashCdKeyAsync(
+        string cdKey, uint clientToken, uint serverToken, string productId, CancellationToken ct = default)
+    {
+        if (_stream == null)
+            throw new InvalidOperationException("Not connected to BNLS");
+
+        var request = new BncsPacketWriter(BNLS_CDKEY)
+            .WriteUInt32(clientToken)
+            .WriteUInt32(serverToken)
+            .WriteCString(productId)
+            .WriteCString(cdKey)
+            .ToBytes();
+
+        await _stream.WriteAsync(request, ct);
+
+        var response = await BncsPacketReader.ReadFromStreamAsync(_stream, ct)
+            ?? throw new IOException("BNLS disconnected during CD key hash");
+
+        var status = response.ReadUInt32();
+        if (status != 0)
+            throw new InvalidOperationException($"BNLS CD key hash failed (status {status})");
+
+        var keyLength = response.ReadUInt32();
+        var product = response.ReadUInt32();
+        var publicValue = response.ReadUInt32();
+        var hash = response.ReadRemaining();
+
+        return (keyLength, product, publicValue, hash);
+    }
+
+    /// <summary>
+    /// Perform version check using BNLS.
+    /// </summary>
+    public async Task<(uint exeVersion, uint exeHash, string exeInfo)> VersionCheckAsync(
+        string productId, string fileName, uint fileTime, string formula, uint clientToken, uint serverToken, CancellationToken ct = default)
+    {
+        if (_stream == null)
+            throw new InvalidOperationException("Not connected to BNLS");
+
+        var request = new BncsPacketWriter(BNLS_VERSIONCHECK)
+            .WriteCString(productId)
+            .WriteCString(fileName)
+            .WriteUInt32(fileTime)
+            .WriteUInt32((uint)formula.Length)
+            .WriteCString(formula)
+            .WriteUInt32(clientToken)
+            .WriteUInt32(serverToken)
+            .ToBytes();
+
+        await _stream.WriteAsync(request, ct);
+
+        var response = await BncsPacketReader.ReadFromStreamAsync(_stream, ct)
+            ?? throw new IOException("BNLS disconnected during version check");
+
+        var status = response.ReadUInt32();
+        if (status != 0)
+            throw new InvalidOperationException($"BNLS version check failed (status {status})");
+
+        var exeVersion = response.ReadUInt32();
+        var exeHash = response.ReadUInt32();
+        var exeInfo = response.ReadCString();
+
+        return (exeVersion, exeHash, exeInfo);
+    }
+
+    /// <summary>
+    /// Get broken SHA-1 hash from BNLS.
+    /// </summary>
+    public async Task<byte[]> GetBrokenSha1Async(byte[] data, CancellationToken ct = default)
+    {
+        if (_stream == null)
+            throw new InvalidOperationException("Not connected to BNLS");
+
+        var request = new BncsPacketWriter(0x14) // custom BNLS command for SHA1
+            .WriteUInt32((uint)data.Length)
+            .WriteRaw(data)
+            .ToBytes();
+
+        await _stream.WriteAsync(request, ct);
+
+        var response = await BncsPacketReader.ReadFromStreamAsync(_stream, ct)
+            ?? throw new IOException("BNLS disconnected during SHA1 hash");
+
+        return response.ReadRemaining();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _stream?.Dispose();
+        _tcp?.Dispose();
+        await Task.CompletedTask;
+    }
+}

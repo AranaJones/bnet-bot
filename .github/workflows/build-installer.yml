@@ -1,0 +1,29 @@
+name: Build install.exe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build installer
+        shell: cmd
+        run: create-installer.bat
+
+      - name: Upload install.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-exe
+          path: |
+            install.exe
+            dist\install\install.exe

@@ -38,10 +38,14 @@ automatic triggers, and owner notifications.
 ### Installation
 
 **Option 1: Automated (Windows)**
-1. Download and run `install.exe` (coming soon)
+1. Download and run `install.exe`
 2. Follow the setup wizard
-3. Edit `appsettings.json` with your settings
-4. Run `run.bat`
+3. Edit `C:\Program Files\BNetDiscordBridge\appsettings.json` with your settings
+4. Launch BNetDiscordBridge from the Start Menu or Desktop shortcut
+
+To build `install.exe` from the repository:
+- Local Windows build: run `create-installer.bat`
+- GitHub build: run the `Build install.exe` Actions workflow and download the `install-exe` artifact
 
 **Option 2: Manual Setup**
 1. Clone the repository

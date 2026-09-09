@@ -23,14 +23,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
-copy /y ".\dist\install\install.exe" ".\install.exe" >nul
+copy /y ".\dist\install\installer.exe" ".\installer.exe" >nul
 if errorlevel 1 (
-    echo ERROR: Failed to copy install.exe to repository root
+    echo ERROR: Failed to copy installer.exe to repository root
     exit /b 1
 )
 
 echo [2/2] Installer created successfully
 echo.
 echo Output files:
-echo   %cd%\install.exe
-echo   %cd%\dist\install\install.exe
+echo   %cd%\installer.exe
+echo   %cd%\dist\install\installer.exe

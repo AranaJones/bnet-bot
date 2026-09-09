@@ -1,4 +1,4 @@
-name: Build install.exe
+name: Build installer.exe
 
 on:
   workflow_dispatch:
@@ -23,10 +23,10 @@ jobs:
         shell: cmd
         run: create-installer.bat
 
-      - name: Upload install.exe
+      - name: Upload installer.exe
         uses: actions/upload-artifact@v4
         with:
-          name: install-exe
+          name: installer-exe
           path: |
-            install.exe
-            dist\install\install.exe
+            installer.exe
+            dist\install\installer.exe

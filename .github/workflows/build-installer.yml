@@ -3,6 +3,9 @@ name: Build install.exe
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-installer:
     runs-on: windows-latest

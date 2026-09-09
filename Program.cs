@@ -21,8 +21,7 @@ if (config.DiscordOwnerId == 0)
 // TODO: replace with a real IGameAuthProvider backed by BNCSutil (or a port
 // of it) for the exact game/version you're connecting as. See
 // Bncs/IGameAuthProvider.cs for why this can't be a generic implementation.
-IGameAuthProvider auth = throw new NotImplementedException(
-    "Wire up an IGameAuthProvider implementation (CD key hash + CheckRevision) before running. See README.md.");
+IGameAuthProvider auth = CreateAuthProvider();
 
 var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
@@ -75,3 +74,6 @@ foreach (var trigger in triggerManager.GetAllTriggers())
 
 try { await Task.Delay(Timeout.Infinite, cts.Token); }
 catch (TaskCanceledException) { }
+
+static IGameAuthProvider CreateAuthProvider() => throw new NotImplementedException(
+    "Wire up an IGameAuthProvider implementation (CD key hash + CheckRevision) before running. See README.md.");

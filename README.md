@@ -38,10 +38,20 @@ automatic triggers, and owner notifications.
 ### Installation
 
 **Option 1: Automated (Windows)**
-1. Download and run `install.exe` (coming soon)
+1. Build `install.exe` from this repository (see "Build Windows installer" below)
 2. Follow the setup wizard
 3. Edit `appsettings.json` with your settings
 4. Run `run.bat`
+
+### Build Windows installer (contributors/CI)
+1. Install [NSIS](https://nsis.sourceforge.io/download)
+2. Run:
+   ```bat
+   build-installer.bat
+   ```
+3. Use the generated `install.exe` in the repository root
+
+`create-installer.bat` and `build-exe-installer.bat` are compatibility wrappers that call `build-installer.bat`.
 
 **Option 2: Manual Setup**
 1. Clone the repository

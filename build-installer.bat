@@ -1,4 +1,6 @@
 @echo off
+setlocal
+cd /d "%~dp0"
 REM BNetDiscordBridge - Automated Installer Builder
 REM This script builds the NSIS installer
 
@@ -8,6 +10,9 @@ echo BNetDiscordBridge Installer Builder
 echo ======================================
 echo.
 
+set PUBLISH_DIR=bin\Release\publish
+set INSTALLER_NAME=install.exe
+
 REM Check if NSIS is installed
 set NSIS_PATH=
 if exist "C:\Program Files (x86)\NSIS\makensis.exe" (
@@ -15,11 +20,15 @@ if exist "C:\Program Files (x86)\NSIS\makensis.exe" (
 ) else if exist "C:\Program Files\NSIS\makensis.exe" (
     set NSIS_PATH=C:\Program Files\NSIS\makensis.exe
 ) else (
-    echo ERROR: NSIS is not installed!
-    echo Download from: https://nsis.sourceforge.io/download
-    echo.
-    pause
-    exit /b 1
+    where makensis >nul 2>&1
+    if errorlevel 1 (
+        echo ERROR: NSIS is not installed!
+        echo Download from: https://nsis.sourceforge.io/download
+        echo.
+        pause
+        exit /b 1
+    )
+    set NSIS_PATH=makensis
 )
 
 echo [1/4] NSIS found: %NSIS_PATH%
@@ -40,7 +49,8 @@ echo.
 
 REM Build the release executable
 echo [3/4] Building release executable...
-call dotnet publish -c Release -o bin\Release\publish --self-contained -r win-x64
+if exist "%PUBLISH_DIR%" rmdir /s /q "%PUBLISH_DIR%"
+call dotnet publish -c Release -o "%PUBLISH_DIR%" --self-contained -r win-x64
 if errorlevel 1 (
     echo ERROR: Build failed!
     echo.
@@ -52,7 +62,7 @@ echo.
 
 REM Build the installer
 echo [4/4] Building installer...
-"%NSIS_PATH%" installer.nsi
+"%NSIS_PATH%" /V2 /DOUTPUT_EXE=%INSTALLER_NAME% installer.nsi
 if errorlevel 1 (
     echo ERROR: Installer build failed!
     echo.
@@ -65,10 +75,10 @@ echo ======================================
 echo Installer Created Successfully!
 echo ======================================
 echo.
-echo Installer location: BNetDiscordBridge-Setup.exe
+echo Installer location: %INSTALLER_NAME%
 echo.
 echo You can now:
-echo 1. Share BNetDiscordBridge-Setup.exe with others
+echo 1. Share %INSTALLER_NAME% with others
 echo 2. Double-click to install
 echo.
 pause
